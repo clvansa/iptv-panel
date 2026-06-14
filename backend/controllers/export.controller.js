@@ -62,7 +62,7 @@ exports.exportPlaylist = async (req, res) => {
                         {
                             model: Channel,
                             through: {
-                                attributes: ["position"]
+                                attributes: ["position", "favorite"]
                             }
                         }
                     ]
@@ -80,9 +80,30 @@ exports.exportPlaylist = async (req, res) => {
 
 
         playlist.Channels.sort(
-            (a, b) =>
-                a.PlaylistChannel.position -
-                b.PlaylistChannel.position
+            (a, b) => {
+
+                if (
+                    a.PlaylistChannel.favorite !==
+                    b.PlaylistChannel.favorite
+                ) {
+
+                    return (
+                        Number(
+                            b.PlaylistChannel.favorite
+                        ) -
+                        Number(
+                            a.PlaylistChannel.favorite
+                        )
+                    );
+
+                }
+
+                return (
+                    a.PlaylistChannel.position -
+                    b.PlaylistChannel.position
+                );
+
+            }
         );
 
 

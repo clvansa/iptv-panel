@@ -31,17 +31,14 @@ export default function LivePlayer({ url, useProxy = false, channelId }) {
             const hls = new Hls({
                 enableWorker: true
             });
-            console.log(streamUrl)
             hls.loadSource(streamUrl);
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                console.log("MANIFEST_PARSED");
                 video.play();
             });
 
             hls.on(Hls.Events.ERROR, (event, data) => {
-                console.log("HLS ERROR", data);
             });
 
             return () => {
@@ -97,7 +94,6 @@ export default function LivePlayer({ url, useProxy = false, channelId }) {
             controls
             autoPlay
             onError={(e) => {
-                console.log("VIDEO ERROR", e);
             }}
             style={{
                 width: "100%",

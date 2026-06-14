@@ -117,3 +117,15 @@ export const removeChannelsFromPlaylist = async (playlistId, channelIds) => {
     const response = await api.delete(`/playlists/${playlistId}/channels`, { data: { channelIds } });
     return response.data;
 };
+
+export const updatePlaylistChannelCountry = async (playlistId, channelId, country_code) => {
+    console.log({ playlistId, channelId, country_code })
+    return await api.put(`/playlists/${playlistId}/channels/${channelId}/country`, {
+        country_code
+    })
+}
+
+
+export const updatePlaylistChannelFavorite = async (playlistId, channelId, favorite) => {
+    return await api.put(`/playlists/${playlistId}/channels/${channelId}/favorite`, { favorite });
+}

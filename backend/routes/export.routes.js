@@ -1,19 +1,10 @@
-const router =
-require("express").Router();
+const router = require("express").Router();
 
-const controller =
-require("../controllers/export.controller");
+const controller = require("../controllers/export.controller");
 
-router.get(
-    "/",
-    controller.exportM3u
-);
+router.get("/", controller.exportM3u);
 
-
-router.get(
-    "/playlist/:id",
-    controller.exportPlaylist
-);
+router.get("/playlist/:id", controller.exportPlaylist);
 
 
 module.exports = router;

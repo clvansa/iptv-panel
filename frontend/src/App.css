@@ -10,7 +10,7 @@ body {
 }
 
 .MuiInputBase-input {
-    color: white !important;
+    /* color: white !important; */
 }
 
 .MuiInputLabel-root {
@@ -18,7 +18,7 @@ body {
 }
 
 .MuiSelect-select {
-    color: white !important;
+    /* color: white !important; */
 }
 
 .MuiOutlinedInput-notchedOutline {

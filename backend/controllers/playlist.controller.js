@@ -47,7 +47,7 @@ exports.getPlaylist = async (req, res) => {
         const playlist = await Playlist.findByPk(req.params.id, {
             include: [{
                 model: Channel,
-                through: { attributes: ["position"] }
+                through: { attributes: ["position", "country_code", "favorite"] }
             }]
         });
 
@@ -80,7 +80,9 @@ exports.addChannels = async (req, res) => {
         for (const channelId of req.body.channelIds) {
             const [item, created] = await PlaylistChannel.findOrCreate({
                 where: { PlaylistId: playlist.id, ChannelId: channelId },
-                defaults: { position: position }
+                defaults: {
+                    position: position
+                }
             });
 
             if (created) {
@@ -96,7 +98,7 @@ exports.addChannels = async (req, res) => {
 
 exports.addFilteredChannels = async (req, res) => {
 
- 
+
     try {
         const playlist = await Playlist.findByPk(req.params.id);
 
@@ -111,9 +113,7 @@ exports.addFilteredChannels = async (req, res) => {
         if (req.body.search) {
             where.name = { [Op.like]: `%${req.body.search}%` };
         }
-        console.log(req.body);
 
-        console.log(where);
         const channels = await Channel.findAll({ where });
 
         const maxPosition = await PlaylistChannel.max("position", {
@@ -125,7 +125,10 @@ exports.addFilteredChannels = async (req, res) => {
         for (const channel of channels) {
             const [item, created] = await PlaylistChannel.findOrCreate({
                 where: { PlaylistId: playlist.id, ChannelId: channel.id },
-                defaults: { position }
+                defaults: {
+                    position,
+                    country_code: channel.country_code
+                }
             });
 
             if (created) {
@@ -223,3 +226,50 @@ exports.removeChannels = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+
+exports.updatePlaylistChannelCountry = async (req, res) => {
+    try {
+        const item = await PlaylistChannel.findOne({
+            where: {
+                playlistId: req.params.playlistId,
+                channelId: req.params.channelId
+            }
+        })
+        console.log(req.params)
+        if (!item) {
+            return res.status(404).json({ message: "Channel not found in playlist" })
+        }
+
+        await item.update({
+            country_code: req.body.country_code
+        })
+
+        res.status(200).json({ success: true })
+    } catch (error) {
+        res.status(500).json({ message: error.message })
+    }
+}
+
+
+exports.toggleFavorite = async (req, res) => {
+
+    try {
+
+        const item = await PlaylistChannel.findOne({
+            where: {
+                playlistId: req.params.playlistId,
+                channelId: req.params.channelId
+            }
+        })
+        if (!item) {
+            return res.status(404).json({ message: "Channel not found" });
+        }
+        await item.update({
+            favorite: req.body.favorite
+        })
+        res.json({ success: true })
+    } catch (error) {
+        res.status(500).json({ message: error.message })
+    }
+}

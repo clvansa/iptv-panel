@@ -48,6 +48,3 @@ export const importPlaylist =
 
     };
 
-export const updateChannelCountry = async (id, country_code) => {
-    return await api.put(`/channels/${id}/country`, { country_code })
-}

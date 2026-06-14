@@ -24,7 +24,7 @@ const Channel = sequelize.define("Channel", {
     },
 
     language: {
-        type: DataTypes.STRING(50)
+        type: DataTypes.TEXT
     },
 
     source: {

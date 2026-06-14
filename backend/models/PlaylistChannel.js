@@ -7,6 +7,14 @@ const PlaylistChannel = sequelize.define(
         position: {
             type: DataTypes.INTEGER,
             defaultValue: 0
+        },
+        country_code: {
+            type: DataTypes.STRING(10),
+            allowNull: true
+        },
+        favorite: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
         }
     }
 );

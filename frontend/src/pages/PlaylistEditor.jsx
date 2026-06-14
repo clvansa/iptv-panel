@@ -5,12 +5,15 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, List
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCountries } from "../api/filters";
-import { getPlaylist, removeChannelFromPlaylist, reorderPlaylist, exportPlaylist, updateCountryOrder, removeChannelsFromPlaylist } from "../api/playlists";
-import { updateChannelCountry } from "../api/channels"
+import { getPlaylist, removeChannelFromPlaylist, reorderPlaylist, exportPlaylist, updateCountryOrder, removeChannelsFromPlaylist, updatePlaylistChannelCountry, updatePlaylistChannelFavorite } from "../api/playlists";
 import { Drawer, Chip, Divider } from "@mui/material";
 import LivePlayer from "../components/player/LivePlayer";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import IconButton from "@mui/material/IconButton";
 
 export default function PlaylistEditor() {
+    let draggableIndex = 0;
     const { id } = useParams();
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
@@ -21,6 +24,8 @@ export default function PlaylistEditor() {
     const selectedSet = new Set(selectedRows);
     const [collapsedCountries, setCollapsedCountries] = useState({});
     const [selectedChannel, setSelectedChannel] = useState(null);
+    const [favoritesDialog, setFavoritesDialog] = useState(false);
+    const favoriteChannels = channels.filter(channel => channel.favorite);
     const [useProxy, setUseProxy] = useState(() => {
         return localStorage.getItem("useProxy") === "true";
     });
@@ -37,7 +42,12 @@ export default function PlaylistEditor() {
 
     useEffect(() => {
         if (data?.Channels) {
-            setChannels(data.Channels);
+            const mapped = data.Channels.map(channel => ({
+                ...channel,
+                playlist_country_code: channel.PlaylistChannel?.country_code || channel.country_code,
+                favorite: channel.PlaylistChannel?.favorite || false
+            }))
+            setChannels(mapped);
         }
         if (data?.country_order) {
             setCountryOrder(data.country_order);
@@ -72,11 +82,21 @@ export default function PlaylistEditor() {
     });
 
     const updateCountryMutation = useMutation({
-        mutationFn: ({ channelId, country_code }) => updateChannelCountry(channelId, country_code),
-        onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: ["playlist", id]
-            })
+        mutationFn: ({ channelId, country_code }) => updatePlaylistChannelCountry(id, channelId, country_code),
+        // onSuccess: () => {
+        //     queryClient.invalidateQueries({
+        //         queryKey: ["playlist", id]
+        //     })
+        // }
+    })
+
+    const favoriteMutation = useMutation({
+        mutationFn: ({ channelId, favorite }) => updatePlaylistChannelFavorite(id, channelId, favorite),
+        onSuccess: (data, variables) => {
+            setChannels(prev => prev.map(channel => channel.id === variables.channelId ? {
+                ...channel, favorite: variables.favorite
+            } : channel
+            ))
         }
     })
 
@@ -85,18 +105,37 @@ export default function PlaylistEditor() {
         const items = Array.from(channels);
         const sourceChannel = items[result.source.index];
         const targetChannel = items[result.destination.index];
-        const oldCountry = sourceChannel.country_code;
-        const newCountry = targetChannel?.country_code;
+        const oldCountry = sourceChannel.playlist_country_code;
+        const newCountry = targetChannel?.playlist_country_code;
 
         if (newCountry && oldCountry !== newCountry) {
-            sourceChannel.country_code = newCountry;
+            sourceChannel.playlist_country_code = newCountry;
             updateCountryMutation.mutate({ channelId: sourceChannel.id, country_code: newCountry });
         }
         const [moved] = items.splice(result.source.index, 1);
         items.splice(result.destination.index, 0, moved);
 
-        setChannels(items);
-        reorderMutation.mutate(items.map(item => item.id));
+        // const sorted = [...items].sort((a,b) => a.playlist_country_code.localeCompare(b.playlist_country_code))
+        const sorted = [...items].sort((a, b) => {
+
+            const aOrder =
+                getCountryPosition(
+                    a.playlist_country_code
+                );
+
+            const bOrder =
+                getCountryPosition(
+                    b.playlist_country_code
+                );
+
+            if (aOrder !== bOrder) {
+                return aOrder - bOrder;
+            }
+
+            return 0;
+        });
+        setChannels(sorted);
+        reorderMutation.mutate(sorted.map(item => item.id));
     };
 
     const handleCountryDragEnd = (result) => {
@@ -150,7 +189,7 @@ export default function PlaylistEditor() {
             return true;
         }
 
-        return channels[index - 1].country_code !== channels[index].country_code;
+        return channels[index - 1].playlist_country_code !== channels[index].playlist_country_code;
     };
 
     const getFlagEmoji = (countryCode) => {
@@ -164,7 +203,7 @@ export default function PlaylistEditor() {
     };
 
     const countryCounts = filteredChannels.reduce((acc, channel) => {
-        acc[channel.country_code] = (acc[channel.country_code] || 0) + 1;
+        acc[channel.playlist_country_code] = (acc[channel.playlist_country_code] || 0) + 1;
         return acc;
     }, {});
 
@@ -176,7 +215,7 @@ export default function PlaylistEditor() {
     };
 
     return (
-        <Box sx={{color:"#ffffff"}}>
+        <Box sx={{ color: "#ffffff" }}>
             <Typography variant="h4" sx={{ mb: 2 }}>
                 {data?.name}
             </Typography>
@@ -212,6 +251,14 @@ export default function PlaylistEditor() {
                 <Button variant="outlined" onClick={() => setCountryDialog(true)}>
                     Country Order
                 </Button>
+                <Button
+                    variant="outlined"
+                    onClick={() =>
+                        setFavoritesDialog(true)
+                    }
+                >
+                    ⭐ Favorites
+                </Button>
             </Box>
 
             <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
@@ -245,21 +292,21 @@ export default function PlaylistEditor() {
                                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                                 <Button
                                                     size="small"
-                                                    onClick={() => toggleCountry(channel.country_code)}
+                                                    onClick={() => toggleCountry(channel.playlist_country_code)}
                                                 >
-                                                    {collapsedCountries[channel.country_code] ? "▶" : "▼"}
+                                                    {collapsedCountries[channel.playlist_country_code] ? "▶" : "▼"}
                                                 </Button>
                                             </Box>
 
                                             <Checkbox
                                                 checked={
                                                     filteredChannels
-                                                        .filter(c => c.country_code === channel.country_code)
+                                                        .filter(c => c.playlist_country_code === channel.playlist_country_code)
                                                         .every(c => selectedRows.includes(c.id))
                                                 }
                                                 onChange={(e) => {
                                                     const countryIds = filteredChannels
-                                                        .filter(c => c.country_code === channel.country_code)
+                                                        .filter(c => c.playlist_country_code === channel.playlist_country_code)
                                                         .map(c => c.id);
 
                                                     if (e.target.checked) {
@@ -276,16 +323,16 @@ export default function PlaylistEditor() {
 
                                             <Typography variant="h6" fontWeight="bold">
                                                 {" "}
-                                                {getCountryName(channel.country_code)}
+                                                {getCountryName(channel.playlist_country_code)}
                                                 {" ("}
-                                                {countryCounts[channel.country_code]}
+                                                {countryCounts[channel.playlist_country_code]}
                                                 {" Channels)"}
                                             </Typography>
                                         </Paper>
                                     )}
 
-                                    {!collapsedCountries[channel.country_code] && (
-                                        <Draggable draggableId={String(channel.id)} index={index}>
+                                    {!collapsedCountries[channel.playlist_country_code] && (
+                                        <Draggable draggableId={String(channel.id)} index={draggableIndex++}>
                                             {(provided) => (
                                                 <Paper
                                                     ref={provided.innerRef}
@@ -318,18 +365,24 @@ export default function PlaylistEditor() {
                                                         <Box>
                                                             <Typography>{channel.name}</Typography>
                                                             <Typography variant="body2" color="text.secondary">
-                                                                {getCountryName(channel.country_code)} {" • "} {channel.language?.includes("ara") ? "Arabic" : channel.language} {" • "} {channel.category?.includes("Undefined") ? "" : channel.category}
+                                                                {getCountryName(channel.playlist_country_code)} {" • "} {channel.language?.includes("ara") ? "Arabic" : channel.language} {" • "} {channel.category?.includes("Undefined") ? "" : channel.category}
                                                             </Typography>
                                                         </Box>
                                                     </Box>
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 
-                                                    <Button
-                                                        color="error"
-                                                        variant="contained"
-                                                        onClick={() => removeMutation.mutate({ channelId: channel.id })}
-                                                    >
-                                                        Remove
-                                                    </Button>
+                                                        <IconButton onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate({ channelId: channel.id, favorite: !channel.favorite }); }}>
+                                                            {channel.favorite ? (<StarIcon color="warning" />) : (<StarBorderIcon />)}
+                                                        </IconButton>
+
+                                                        <Button
+                                                            color="error"
+                                                            variant="contained"
+                                                            onClick={() => removeMutation.mutate({ channelId: channel.id })}
+                                                        >
+                                                            Remove
+                                                        </Button>
+                                                    </Box>
                                                 </Paper>
                                             )}
                                         </Draggable>
@@ -424,7 +477,7 @@ export default function PlaylistEditor() {
                                     </Typography>
 
                                     <Chip
-                                        label={selectedChannel.country_code}
+                                        label={selectedChannel.playlist_country_code}
                                         size="small"
                                     />
                                 </Box>
@@ -456,6 +509,110 @@ export default function PlaylistEditor() {
                     )}
                 </Box>
             </Drawer>
+
+            <Dialog
+                open={favoritesDialog}
+                onClose={() =>
+                    setFavoritesDialog(false)
+                }
+                maxWidth="md"
+                fullWidth
+            >
+
+                <DialogTitle>
+                    Favorite Channels
+                </DialogTitle>
+
+                <DialogContent>
+
+                    {favoriteChannels.map(
+                        channel => (
+
+                            <Paper
+                                key={channel.id}
+                                sx={{
+                                    p: 2,
+                                    mb: 2,
+                                }}
+                            >
+
+
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center"
+                                    }}
+                                >
+
+                                    <Box sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        gap: 2
+                                    }}>
+                                        <Box component="img" src={channel.logo || "https://placehold.co/60x40?text=TV"} alt={channel.name} sx={{ width: 60, height: 40, objectFit: "contain", borderRadius: 1, bgcolor: "#fff" }} />
+                                        <Box>
+                                            <Typography>
+                                                {channel.name}
+                                            </Typography>
+
+                                            <Typography
+                                                variant="body2"
+                                            >
+                                                {
+                                                    getCountryName(
+                                                        channel.playlist_country_code
+                                                    )
+                                                }
+                                            </Typography>
+                                        </Box>
+
+                                    </Box>
+
+
+
+
+
+                                    <IconButton
+                                        onClick={() =>
+                                            favoriteMutation.mutate({
+                                                channelId:
+                                                    channel.id,
+                                                favorite:
+                                                    false
+
+                                            })
+                                        }
+                                    >
+                                        <StarIcon
+                                            color="warning"
+                                        />
+                                    </IconButton>
+
+                                </Box>
+
+                            </Paper>
+
+                        )
+                    )}
+
+                </DialogContent>
+
+                <DialogActions>
+
+                    <Button
+                        onClick={() =>
+                            setFavoritesDialog(false)
+                        }
+                    >
+                        Close
+                    </Button>
+
+                </DialogActions>
+
+            </Dialog>
         </Box>
     );
 }
