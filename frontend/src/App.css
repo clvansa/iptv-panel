@@ -1,0 +1,26 @@
+* {
+    font-family: "Poppins", sans-serif !important;
+}
+
+body {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+
+}
+
+.MuiInputBase-input {
+    color: white !important;
+}
+
+.MuiInputLabel-root {
+    color: #b8b2b2 !important;
+}
+
+.MuiSelect-select {
+    color: white !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+    border-color: #b8b2b218 !important;
+}
