@@ -4,46 +4,22 @@ const Channel = require("../models/Channel");
 exports.exportM3u = async (req, res) => {
 
     try {
-
         const filters = {};
+        
+        if (req.query.country) { filters.country_code = req.query.country.toUpperCase(); }
 
-        if (req.query.country) {
+        if (req.query.category) { filters.category = req.query.category; }
 
-            filters.country_code =
-                req.query.country.toUpperCase();
+        const content = await exportService.generateM3u(filters);
 
-        }
+        res.setHeader("Content-Type", "application/x-mpegURL");
 
-        if (req.query.category) {
-
-            filters.category =
-                req.query.category;
-
-        }
-
-        const content =
-            await exportService.generateM3u(
-                filters
-            );
-
-        res.setHeader(
-            "Content-Type",
-            "application/x-mpegURL"
-        );
-
-        res.setHeader(
-            "Content-Disposition",
-            "attachment; filename=playlist.m3u"
-        );
+        res.setHeader("Content-Disposition", "attachment; filename=playlist.m3u");
 
         res.send(content);
 
     } catch (error) {
-
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
 
     }
 

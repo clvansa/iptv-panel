@@ -115,12 +115,14 @@ exports.proxyStream = async (req, res) => {
 
     } catch (error) {
         console.error("Proxy Stream Error:", error);
+
         res.status(500).json({ message: error.message });
     }
 };
 
 // 4. جلب ومعالجة ملفات الـ Chunk أو الـ Playlists الفرعية عبر الرابط المباشر
 exports.proxyFile = async (req, res) => {
+
     try {
         const response = await axios.get(req.query.url, { responseType: "arraybuffer" });
 
@@ -147,11 +149,14 @@ exports.proxyFile = async (req, res) => {
             res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
             return res.send(rewritten);
         }
+        console.log("URL =", req.query.url);
 
         res.send(response.data);
 
     } catch (error) {
+
         console.error("Proxy File Error:", error);
+
         res.status(500).json({ message: error.message });
     }
 };

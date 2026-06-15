@@ -10,7 +10,11 @@ body {
 }
 
 .MuiInputBase-input {
-    /* color: white !important; */
+    color: white !important;
+}
+
+#dialog_add_channel {
+    color: black !important;
 }
 
 .MuiInputLabel-root {
@@ -18,7 +22,7 @@ body {
 }
 
 .MuiSelect-select {
-    /* color: white !important; */
+    /* color: red !important; */
 }
 
 .MuiOutlinedInput-notchedOutline {

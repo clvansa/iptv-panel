@@ -150,7 +150,7 @@ export default function EditChannel() {
 
             <Typography
                 variant="h4"
-                sx={{ mb: 3 }}
+                sx={{ mb: 3, color: "#ffffff" }}
             >
                 Edit Channel
             </Typography>

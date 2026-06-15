@@ -214,7 +214,7 @@ export default function Channels() {
             <Dialog open={openPlaylistDialog} onClose={() => setOpenPlaylistDialog(false)}>
                 <DialogTitle>Add Channels To Playlist</DialogTitle>
                 <DialogContent>
-                    <Select fullWidth value={playlistId} onChange={(e) => setPlaylistId(e.target.value)} sx={{ mt: 2 }}>
+                    <Select fullWidth value={playlistId} onChange={(e) => setPlaylistId(e.target.value)} sx={{ mt: 2 }} id="dialog_add_channel">
                         {playlists?.map(playlist => (
                             <MenuItem key={playlist.id} value={playlist.id}>{playlist.name}</MenuItem>
                         ))}

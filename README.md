@@ -89,7 +89,6 @@ DB_NAME=iptv_panel
 DB_USER=root
 DB_PASSWORD=
 
-JWT_SECRET=your_secret
 ```
 
 Start backend:
