@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const sequelize = require("../config/database");
 const Playlist = require("../models/Playlist");
 const Channel = require("../models/Channel");
 const PlaylistChannel = require("../models/PlaylistChannel");
