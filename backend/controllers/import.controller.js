@@ -1,28 +1,35 @@
-const importService =
-    require("../services/import.service");
+const importService = require("../services/import.service");
 
-exports.importUrl = async (
-    req,
-    res
-) => {
-
+exports.importUrl = async (req, res) => {
     try {
-
         const { url } = req.body;
 
-        if (!url) {
-
+        if (typeof url !== "string" || !url.trim()) {
             return res.status(400).json({
                 success: false,
-                message: "URL required"
+                message: "Valid URL required"
             });
-
         }
 
-        const result =
-            await importService
-                .importFromUrl(url);
+        let parsedUrl;
 
+        try {
+            parsedUrl = new URL(url);
+        } catch {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid URL"
+            });
+        }
+
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+            return res.status(400).json({
+                success: false,
+                message: "Only HTTP and HTTPS URLs are allowed"
+            });
+        }
+
+        const result = await importService.importFromUrl(url);
 
         res.json({
             success: true,
@@ -30,14 +37,11 @@ exports.importUrl = async (
         });
 
     } catch (error) {
-
-        console.log(error);
+        console.error("Import Error:", error);
 
         res.status(500).json({
             success: false,
             message: error.message
         });
-
     }
-
 };

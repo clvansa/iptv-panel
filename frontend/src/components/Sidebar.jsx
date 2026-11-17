@@ -103,7 +103,7 @@ export default function Sidebar() {
                     to="/playlists/add"
                     selected={
                         location.pathname ===
-                        "/playlists"
+                        "/playlists/add"
                     }
                 >
 

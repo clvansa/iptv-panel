@@ -16,6 +16,10 @@ exports.getChannels = async (req, res) => {
             where.country_code = req.query.country.toUpperCase();
         }
 
+        if (req.query.language) {
+            where.language = req.query.language;
+        }
+
         if (req.query.category) {
             where.category = req.query.category;
         }
@@ -79,85 +83,180 @@ exports.proxyStream = async (req, res) => {
         const channel = await Channel.findByPk(req.params.id);
 
         if (!channel) {
-            return res.status(404).json({ message: "Channel not found" });
+            return res.status(404).json({
+                message: "Channel not found"
+            });
         }
 
-        const response = await axios.get(channel.stream_url, { responseType: "text" });
+        const apiBase = process.env.PUBLIC_API_URL;
+
+        if (!apiBase) {
+            throw new Error("PUBLIC_API_URL is not configured");
+        }
+
+        const response = await axios.get(channel.stream_url, {
+            responseType: "text",
+            timeout: 15000,
+            maxRedirects: 3
+        });
+
         const playlist = response.data;
-        const baseUrl = channel.stream_url.substring(0, channel.stream_url.lastIndexOf("/") + 1);
+
+        const proxyUrl = (targetUrl) => {
+            return `${apiBase}/channels/proxy?url=${encodeURIComponent(targetUrl)}`;
+        };
 
         const rewritten = playlist
-            .split("\n")
+            .split(/\r?\n/)
             .map(line => {
-                // معالجة أسطر الميتا داتا التي تحتوي على روابط مثل الـ الكي أو الكاستم تراكس
-                if (line.includes('URI="')) {
-                    return line.replace(/URI="([^"]+)"/, (_, uri) => {
-                        const absoluteUrl = new URL(uri, baseUrl).href;
-                        return `URI="http://localhost:5000/api/channels/proxy?url=${encodeURIComponent(absoluteUrl)}"`;
-                    });
+                const trimmed = line.trim();
+
+                if (!trimmed) return line;
+
+                // معالجة روابط URI مثل مفاتيح AES وملفات الصوت
+                if (trimmed.startsWith("#")) {
+                    return line.replace(
+                        /URI="([^"]+)"/g,
+                        (_, uri) => {
+                            const absoluteUrl = new URL(
+                                uri,
+                                channel.stream_url
+                            ).href;
+
+                            return `URI="${proxyUrl(absoluteUrl)}"`;
+                        }
+                    );
                 }
 
-                // تجنب الأسطر الفارغة أو التعليقات الخاصة بالـ M3U8
-                if (!line.trim() || line.startsWith("#")) {
-                    return line;
-                }
+                // معالجة روابط TS و M3U8
+                const absoluteUrl = new URL(
+                    trimmed,
+                    channel.stream_url
+                ).href;
 
-                // تحويل الروابط النسبية لملفات الـ TS إلى روابط مطلقة وتمريرها عبر البروكسي
-                const absoluteUrl = new URL(line, channel.stream_url).href;
-                return `http://localhost:5000/api/channels/proxy?url=${encodeURIComponent(absoluteUrl)}`;
+                return proxyUrl(absoluteUrl);
             })
             .join("\n");
 
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.apple.mpegurl"
+        );
+
+        res.setHeader("Cache-Control", "no-cache");
 
         res.send(rewritten);
 
     } catch (error) {
-        console.error("Proxy Stream Error:", error);
+        console.error("Proxy Stream Error:", error.message);
 
-        res.status(500).json({ message: error.message });
+        res.status(502).json({
+            message: "Failed to load stream"
+        });
     }
 };
 
 // 4. جلب ومعالجة ملفات الـ Chunk أو الـ Playlists الفرعية عبر الرابط المباشر
 exports.proxyFile = async (req, res) => {
-
     try {
-        const response = await axios.get(req.query.url, { responseType: "arraybuffer" });
+        const targetUrl = req.query.url;
 
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        if (!targetUrl) {
+            return res.status(400).json({
+                message: "URL required"
+            });
+        }
 
-        if (req.query.url.endsWith(".m3u8")) {
-            const baseUrl = req.query.url.substring(0, req.query.url.lastIndexOf("/") + 1);
+        const apiBase = process.env.PUBLIC_API_URL;
 
-            // إصلاح تحويل الـ Buffer لنص بترميز utf8
+        if (!apiBase) {
+            throw new Error("PUBLIC_API_URL is not configured");
+        }
+
+        const parsedUrl = new URL(targetUrl);
+
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+            return res.status(400).json({
+                message: "Invalid URL protocol"
+            });
+        }
+
+        const response = await axios.get(targetUrl, {
+            responseType: "arraybuffer",
+            timeout: 15000,
+            maxRedirects: 3,
+            maxContentLength: 20 * 1024 * 1024
+        });
+
+        const contentType = response.headers["content-type"] || "";
+
+        const isM3u8 =
+            /\.m3u8(?:$|\?)/i.test(parsedUrl.pathname + parsedUrl.search) ||
+            contentType.includes("mpegurl");
+
+        if (isM3u8) {
             const playlist = response.data.toString("utf8");
 
             const rewritten = playlist
-                .split("\n")
+                .split(/\r?\n/)
                 .map(line => {
-                    if (!line.trim() || line.startsWith("#")) {
-                        return line;
+                    const trimmed = line.trim();
+
+                    if (!trimmed) return line;
+
+                    if (trimmed.startsWith("#")) {
+                        return line.replace(
+                            /URI="([^"]+)"/g,
+                            (_, uri) => {
+                                const absoluteUrl = new URL(
+                                    uri,
+                                    targetUrl
+                                ).href;
+
+                                return `URI="${apiBase}/channels/proxy?url=${encodeURIComponent(absoluteUrl)}"`;
+                            }
+                        );
                     }
 
-                    const absoluteUrl = new URL(line, baseUrl).href;
-                    return `http://localhost:5000/api/channels/proxy?url=${encodeURIComponent(absoluteUrl)}`;
+                    const absoluteUrl = new URL(
+                        trimmed,
+                        targetUrl
+                    ).href;
+
+                    return `${apiBase}/channels/proxy?url=${encodeURIComponent(absoluteUrl)}`;
                 })
                 .join("\n");
 
-            res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+            res.setHeader(
+                "Content-Type",
+                "application/vnd.apple.mpegurl"
+            );
+
+            res.setHeader("Cache-Control", "no-cache");
+
             return res.send(rewritten);
         }
-        console.log("URL =", req.query.url);
+
+        res.setHeader(
+            "Content-Type",
+            contentType || "application/octet-stream"
+        );
+
+        if (response.headers["content-length"]) {
+            res.setHeader(
+                "Content-Length",
+                response.headers["content-length"]
+            );
+        }
 
         res.send(response.data);
 
     } catch (error) {
+        console.error("Proxy File Error:", error.message);
 
-        console.error("Proxy File Error:", error);
-
-        res.status(500).json({ message: error.message });
+        res.status(502).json({
+            message: "Failed to load stream resource"
+        });
     }
 };
 
@@ -177,7 +276,7 @@ exports.getChannel = async (req, res) => {
     try {
         const channel = await Channel.findByPk(req.params.id);
         if (!channel) {
-            return rrs.status(404).json({ message: "Channel not found" })
+            return res.status(404).json({ message: "Channel not found" })
         }
 
         res.json(channel)
@@ -204,14 +303,25 @@ exports.updateChannel = async (req, res) => {
 };
 
 
-exports.updateCountry = async (req, res) => {
-    const channel = await Channel.findByPk(req.params.id);
-    if (!channel) {
-        return res.status(404).json({ message: "Channel not found!" })
 
+exports.updateCountry = async (req, res) => {
+    try {
+        const channel = await Channel.findByPk(req.params.id);
+
+        if (!channel) {
+            return res.status(404).json({
+                message: "Channel not found!"
+            });
+        }
+
+        await channel.update({
+            country_code: req.body.country_code
+        });
+
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error("Update Country Error:", error);
+        res.status(500).json({ message: error.message });
     }
-    await channel.update({
-        country_code: req.body.country_code
-    })
-    res.json({ success: true })
-}
+};

@@ -5,7 +5,7 @@ require("dotenv").config({
 const sequelize = require("../config/database");
 const Channel = require("../models/Channel");
 
-exports.fillCountries(async () => {
+(async () => {
 
     try {
 

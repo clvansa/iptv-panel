@@ -45,10 +45,19 @@ export default function EditChannel() {
         useState(null);
 
     useEffect(() => {
+        let active = true;
 
         getChannel(id)
-            .then(setForm);
+            .then((data) => {
+                if (active) setForm(data);
+            })
+            .catch((error) => {
+                console.error("Get Channel Error:", error);
+            });
 
+        return () => {
+            active = false;
+        };
     }, [id]);
 
     const { data: languages } = useQuery({
@@ -82,29 +91,15 @@ export default function EditChannel() {
 
     const [checking, setChecking] = useState(false);
 
-    const handleSave =
-        async () => {
-
-            await updateChannel(
-                id,
-                form
-            );
-
-            navigate(
-                "/"
-            );
-
-        };
-
-    if (!form) {
-
-        return (
-            <Typography>
-                Loading...
-            </Typography>
-        );
-
-    }
+    const handleSave = async () => {
+        try {
+            await updateChannel(id, form);
+            navigate("/");
+        } catch (error) {
+            console.error("Update Channel Error:", error);
+            alert("Failed to update channel. Please try again.");
+        }
+    };
 
     const handleCheckStream =
         async () => {

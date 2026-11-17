@@ -7,9 +7,12 @@ const { syncCountries } = require('./syncCountries.service')
 exports.importFromUrl = async (url) => {
 
     const response = await axios.get(url, {
-        timeout: 30000
+        timeout: 30000,
+        maxContentLength: 20 * 1024 * 1024,
+        maxBodyLength: 20 * 1024 * 1024,
+        responseType: "text"
     });
-    
+
     const channels = parseM3u(response.data);
 
     if (!channels.length) {

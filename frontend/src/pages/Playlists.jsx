@@ -32,7 +32,7 @@ export default function Playlists() {
 
     return (
         <Box>
-            <Typography variant="h4" sx={{ mb: 3,color:"#ffffff" }}>Playlists</Typography>
+            <Typography variant="h4" sx={{ mb: 3, color: "#ffffff" }}>Playlists</Typography>
 
             <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
                 <TextField
@@ -41,7 +41,7 @@ export default function Playlists() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                 />
-                <Button variant="contained" onClick={() => createMutation.mutate({ name })}>
+                <Button variant="contained" disabled={!name} onClick={() => createMutation.mutate({ name })}>
                     Create
                 </Button>
             </Box>
@@ -49,13 +49,18 @@ export default function Playlists() {
             <Grid container spacing={2}>
                 {playlists.map(playlist => (
                     <Grid size={{ xs: 12, md: 4 }} key={playlist.id}>
-                        <Card 
+                        <Card
                             sx={{ cursor: "pointer" }}
                             onClick={() => navigate(`/playlist/${playlist.id}`)}>
                             <CardContent>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <Typography variant="h6">{playlist.name}</Typography>
-                                    <IconButton color="error" onClick={() => deleteMutation.mutate(playlist.id)}>
+                                    <IconButton
+                                        color="error"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteMutation.mutate(playlist.id);
+                                        }}>
                                         <DeleteIcon />
                                     </IconButton>
                                 </Box>

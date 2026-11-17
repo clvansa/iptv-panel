@@ -1,14 +1,21 @@
+const { Op } = require("sequelize");
 const Playlist = require("../models/Playlist");
 const Channel = require("../models/Channel");
 const PlaylistChannel = require("../models/PlaylistChannel");
 
 exports.createPlaylist = async (req, res) => {
     try {
+
+        if (typeof req.body.name !== "string" || !req.body.name.trim()) {
+            return res.status(400).json({
+                message: "Playlist name is required"
+            });
+        }
+
         const playlist = await Playlist.create({
-            name: req.body.name,
+            name: req.body.name.trim(),
             description: req.body.description,
             country_order: [
-
                 "SY",
                 "LB",
                 "SA",
@@ -22,10 +29,11 @@ exports.createPlaylist = async (req, res) => {
                 "BH",
                 "OM",
                 "OTHER"
-
             ]
         });
+
         res.json(playlist);
+
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -65,6 +73,11 @@ exports.getPlaylist = async (req, res) => {
 
 exports.addChannels = async (req, res) => {
     try {
+        if (!Array.isArray(req.body.channelIds) || req.body.channelIds.length === 0) {
+            return res.status(400).json({
+                message: "channelIds must be a non-empty array"
+            });
+        }
         const playlist = await Playlist.findByPk(req.params.id);
 
         if (!playlist) {
@@ -180,14 +193,29 @@ exports.reorderChannels = async (req, res) => {
         const playlistId = req.params.id;
         const channelIds = req.body.channelIds;
 
-        for (let i = 0; i < channelIds.length; i++) {
-            await PlaylistChannel.update(
-                { position: i },
-                { where: { PlaylistId: playlistId, ChannelId: channelIds[i] } }
-            );
+        if (!Array.isArray(channelIds)) {
+            return res.status(400).json({
+                message: "channelIds must be an array"
+            });
         }
 
+        await sequelize.transaction(async (transaction) => {
+            for (let i = 0; i < channelIds.length; i++) {
+                await PlaylistChannel.update(
+                    { position: i },
+                    {
+                        where: {
+                            PlaylistId: playlistId,
+                            ChannelId: channelIds[i]
+                        },
+                        transaction
+                    }
+                );
+            }
+        });
+
         res.json({ success: true });
+
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -214,6 +242,11 @@ exports.updateCountryOrder = async (req, res) => {
 
 exports.removeChannels = async (req, res) => {
     try {
+        if (!Array.isArray(req.body.channelIds) || req.body.channelIds.length === 0) {
+            return res.status(400).json({
+                message: "channelIds must be a non-empty array"
+            });
+        }
         await PlaylistChannel.destroy({
             where: {
                 PlaylistId: req.params.id,
@@ -232,8 +265,8 @@ exports.updatePlaylistChannelCountry = async (req, res) => {
     try {
         const item = await PlaylistChannel.findOne({
             where: {
-                playlistId: req.params.playlistId,
-                channelId: req.params.channelId
+                PlaylistId: req.params.playlistId,
+                ChannelId: req.params.channelId
             }
         })
         console.log(req.params)
@@ -258,8 +291,8 @@ exports.toggleFavorite = async (req, res) => {
 
         const item = await PlaylistChannel.findOne({
             where: {
-                playlistId: req.params.playlistId,
-                channelId: req.params.channelId
+                PlaylistId: req.params.playlistId,
+                ChannelId: req.params.channelId
             }
         })
         if (!item) {

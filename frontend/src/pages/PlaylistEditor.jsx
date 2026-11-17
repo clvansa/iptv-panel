@@ -166,8 +166,8 @@ export default function PlaylistEditor() {
 
     const autoSortChannels = () => {
         const sorted = [...channels].sort((a, b) => {
-            const aOrder = getCountryPosition(a.country_code);
-            const bOrder = getCountryPosition(b.country_code);
+            const aOrder = getCountryPosition(a.playlist_country_code);
+            const bOrder = getCountryPosition(b.playlist_country_code);
 
             if (aOrder !== bOrder) {
                 return aOrder - bOrder;
@@ -332,7 +332,14 @@ export default function PlaylistEditor() {
                                     )}
 
                                     {!collapsedCountries[channel.playlist_country_code] && (
-                                        <Draggable draggableId={String(channel.id)} index={draggableIndex++}>
+                                        <Draggable
+                                            draggableId={String(channel.id)}
+                                            index={draggableIndex++}
+                                            isDragDisabled={
+                                                search.trim().length > 0 ||
+                                                Object.values(collapsedCountries).some(Boolean)
+                                            }
+                                        >
                                             {(provided) => (
                                                 <Paper
                                                     ref={provided.innerRef}
@@ -378,7 +385,10 @@ export default function PlaylistEditor() {
                                                         <Button
                                                             color="error"
                                                             variant="contained"
-                                                            onClick={() => removeMutation.mutate({ channelId: channel.id })}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                removeMutation.mutate({ channelId: channel.id });
+                                                            }}
                                                         >
                                                             Remove
                                                         </Button>
